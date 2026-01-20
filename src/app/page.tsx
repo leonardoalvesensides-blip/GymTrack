@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dumbbell, Apple, TrendingUp, CreditCard, LogIn, UserPlus } from 'lucide-react'
+import { Dumbbell, Apple, TrendingUp, LogIn, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 
 export default function Home() {
@@ -43,7 +43,7 @@ export default function Home() {
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Link href="/dashboard">
               <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-blue-500 to-blue-600 text-white">
                 <TrendingUp className="w-12 h-12 mb-4" />
@@ -67,20 +67,12 @@ export default function Home() {
                 <p className="text-green-100">Plano alimentar inteligente</p>
               </Card>
             </Link>
-
-            <Link href="/planos">
-              <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-                <CreditCard className="w-12 h-12 mb-4" />
-                <h3 className="text-xl font-bold mb-2">Planos</h3>
-                <p className="text-orange-100">Upgrade seu plano</p>
-              </Card>
-            </Link>
           </div>
 
           <Card className="p-8 bg-white dark:bg-gray-800">
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Bem-vindo ao GymTrack! 🎉</h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Seu aplicativo fitness inteligente com treinos e dietas personalizados por IA.
+              Seu aplicativo fitness 100% gratuito com treinos e dietas personalizados por IA.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -116,7 +108,7 @@ export default function Home() {
             GymTrack
           </h1>
           <p className="text-xl md:text-2xl text-white/90 mb-8">
-            Seu Personal Trainer e Nutricionista com Inteligência Artificial
+            Seu Personal Trainer e Nutricionista com Inteligência Artificial - 100% Gratuito
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth/login">
@@ -161,54 +153,33 @@ export default function Home() {
         </div>
 
         <Card className="p-12 bg-white dark:bg-gray-800 max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">
-            Escolha Seu Plano
+          <h2 className="text-3xl font-bold text-center mb-6 text-gray-900 dark:text-white">
+            Tudo 100% Gratuito! 🎉
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 border-2 border-gray-200 dark:border-gray-700 rounded-lg">
-              <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Gratuito</h3>
-              <p className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">R$ 0</p>
-              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                <li>✓ Treinos básicos</li>
-                <li>✓ Dashboards simples</li>
-                <li>⚠️ Com anúncios</li>
-              </ul>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg">
+              <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">✓ Treinos Personalizados</h3>
+              <p className="text-gray-700 dark:text-gray-300">
+                Treinos gerados por IA baseados no seu perfil, objetivos e nível de experiência
+              </p>
             </div>
-
-            <div className="p-6 border-2 border-blue-500 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-              <h3 className="text-xl font-bold mb-2 text-blue-900 dark:text-blue-100">Basic</h3>
-              <p className="text-3xl font-bold mb-4 text-blue-900 dark:text-blue-100">R$ 9,90</p>
-              <ul className="space-y-2 text-sm text-blue-700 dark:text-blue-300">
-                <li>✓ Treinos com IA</li>
-                <li>✓ Registro de cargas</li>
-                <li>✓ Dieta simples</li>
-                <li>✓ Sem anúncios</li>
-              </ul>
+            <div className="p-6 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg">
+              <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">✓ Dietas Completas</h3>
+              <p className="text-gray-700 dark:text-gray-300">
+                Planos alimentares com receitas detalhadas e lista de compras automática
+              </p>
             </div>
-
-            <div className="p-6 border-2 border-purple-500 rounded-lg bg-purple-50 dark:bg-purple-900/20">
-              <h3 className="text-xl font-bold mb-2 text-purple-900 dark:text-purple-100">Intermediário</h3>
-              <p className="text-3xl font-bold mb-4 text-purple-900 dark:text-purple-100">R$ 19,90</p>
-              <ul className="space-y-2 text-sm text-purple-700 dark:text-purple-300">
-                <li>✓ Tudo do Basic</li>
-                <li>✓ Dieta avançada</li>
-                <li>✓ Dashboards detalhados</li>
-                <li>✓ Lista de compras</li>
-              </ul>
+            <div className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
+              <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">✓ Registro de Evolução</h3>
+              <p className="text-gray-700 dark:text-gray-300">
+                Acompanhe suas cargas, medidas e progresso com dashboards visuais
+              </p>
             </div>
-
-            <div className="p-6 border-2 border-orange-500 rounded-lg bg-gradient-to-br from-orange-50 to-pink-50 dark:from-orange-900/20 dark:to-pink-900/20">
-              <div className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block">
-                RECOMENDADO
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-orange-900 dark:text-orange-100">Avançado</h3>
-              <p className="text-3xl font-bold mb-4 text-orange-900 dark:text-orange-100">R$ 29,90</p>
-              <ul className="space-y-2 text-sm text-orange-700 dark:text-orange-300">
-                <li>✓ Todos os recursos</li>
-                <li>✓ Treinos adaptativos</li>
-                <li>✓ Alertas inteligentes</li>
-                <li>✓ Exportação relatórios</li>
-              </ul>
+            <div className="p-6 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg">
+              <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">✓ Sem Anúncios</h3>
+              <p className="text-gray-700 dark:text-gray-300">
+                Experiência completa sem interrupções ou limitações
+              </p>
             </div>
           </div>
         </Card>

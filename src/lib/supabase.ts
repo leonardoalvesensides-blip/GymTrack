@@ -3,6 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('⚠️ Variáveis de ambiente do Supabase não configuradas')
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type UserProfile = {
@@ -16,7 +20,7 @@ export type UserProfile = {
   nivel_experiencia?: 'iniciante' | 'intermediario' | 'avancado'
   objetivo?: 'hipertrofia' | 'emagrecimento' | 'resistencia' | 'reabilitacao'
   restricoes_fisicas?: string
-  plano: 'gratuito' | 'basic' | 'intermediario' | 'avancado'
+  observacoes?: string
   created_at: string
 }
 
@@ -76,16 +80,5 @@ export type HistoricoProgresso = {
   tipo: 'treino' | 'dieta' | 'corporal'
   data: string
   dados: any
-  created_at: string
-}
-
-export type Assinatura = {
-  id: string
-  usuario_id: string
-  plano: 'gratuito' | 'basic' | 'intermediario' | 'avancado'
-  status: 'ativa' | 'cancelada' | 'expirada'
-  data_inicio: string
-  data_fim?: string
-  valor: number
   created_at: string
 }

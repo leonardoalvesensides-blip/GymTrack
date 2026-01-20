@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { calcularMacros, gerarPlanoAlimentar, sugerirReceitas, gerarListaCompras, RECEITAS_BASE } from '@/lib/ai-dieta'
-import { temPermissao } from '@/lib/permissions'
+import { calcularMacros, gerarPlanoAlimentar, sugerirReceitas, gerarListaCompras } from '@/lib/ai-dieta'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useRouter } from 'next/navigation'
-import { Apple, Sparkles, ShoppingCart, Lock, Download } from 'lucide-react'
+import { Apple, Sparkles, ShoppingCart, Download, ChefHat } from 'lucide-react'
 
 export default function DietaPage() {
   const router = useRouter()
@@ -66,71 +64,69 @@ export default function DietaPage() {
   const gerarNovaDieta = async () => {
     if (!perfil) return
 
-    const plano = perfil.plano || 'gratuito'
-    
-    if (!temPermissao(plano, 'dietaSimples')) {
-      alert('Você precisa de um plano pago para gerar dietas com IA. Faça upgrade!')
-      router.push('/planos')
-      return
-    }
-
     setGerando(true)
 
-    const planoAlimentar = gerarPlanoAlimentar({
-      peso: perfil.peso,
-      altura: perfil.altura,
-      idade: perfil.idade,
-      sexo: perfil.sexo,
-      objetivo: perfil.objetivo,
-      nivel_atividade: 'moderado'
-    })
-
-    const { data: novaDieta } = await supabase
-      .from('dietas')
-      .insert({
-        usuario_id: user.id,
-        objetivo: perfil.objetivo,
-        calorias: planoAlimentar.macros.calorias,
-        proteinas: planoAlimentar.macros.proteinas,
-        carboidratos: planoAlimentar.macros.carboidratos,
-        gorduras: planoAlimentar.macros.gorduras
+    try {
+      const planoAlimentar = gerarPlanoAlimentar({
+        peso: perfil.peso || 70,
+        altura: perfil.altura || 170,
+        idade: perfil.idade || 25,
+        sexo: perfil.sexo || 'masculino',
+        objetivo: perfil.objetivo || 'hipertrofia',
+        nivel_atividade: 'moderado'
       })
-      .select()
-      .single()
 
-    if (novaDieta) {
-      for (const refeicao of planoAlimentar.refeicoes) {
-        const receita = sugerirReceitas(refeicao.tipo, refeicao)
-        
-        await supabase.from('refeicoes').insert({
-          dieta_id: novaDieta.id,
-          tipo: refeicao.tipo,
-          nome: receita.nome,
-          calorias: receita.calorias,
-          proteinas: receita.proteinas,
-          carboidratos: receita.carboidratos,
-          gorduras: receita.gorduras,
-          ingredientes: receita.ingredientes
+      const { data: novaDieta, error: dietaError } = await supabase
+        .from('dietas')
+        .insert({
+          usuario_id: user.id,
+          objetivo: perfil.objetivo || 'hipertrofia',
+          calorias: planoAlimentar.macros.calorias,
+          proteinas: planoAlimentar.macros.proteinas,
+          carboidratos: planoAlimentar.macros.carboidratos,
+          gorduras: planoAlimentar.macros.gorduras
         })
-      }
-    }
+        .select()
+        .single()
 
-    setGerando(false)
-    carregarDados()
+      if (dietaError) {
+        console.error('Erro ao criar dieta:', dietaError)
+        alert('Erro ao gerar dieta. Tente novamente.')
+        setGerando(false)
+        return
+      }
+
+      if (novaDieta) {
+        for (const refeicao of planoAlimentar.refeicoes) {
+          const receita = sugerirReceitas(refeicao.tipo, refeicao, perfil.objetivo || 'hipertrofia')
+          
+          await supabase.from('refeicoes').insert({
+            dieta_id: novaDieta.id,
+            tipo: refeicao.tipo,
+            nome: receita.nome,
+            calorias: receita.calorias,
+            proteinas: receita.proteinas,
+            carboidratos: receita.carboidratos,
+            gorduras: receita.gorduras,
+            ingredientes: receita.ingredientes,
+            preparo: receita.preparo || ''
+          })
+        }
+      }
+
+      setGerando(false)
+      await carregarDados()
+    } catch (error) {
+      console.error('Erro ao gerar dieta:', error)
+      alert('Erro ao gerar dieta. Tente novamente.')
+      setGerando(false)
+    }
   }
 
   const exportarListaCompras = () => {
-    const plano = perfil?.plano || 'gratuito'
-    
-    if (!temPermissao(plano, 'listaCompras')) {
-      alert('Você precisa do plano Intermediário ou Avançado para gerar lista de compras!')
-      router.push('/planos')
-      return
-    }
-
     const lista = gerarListaCompras(refeicoes)
     
-    let texto = 'LISTA DE COMPRAS - FitAI Pro\n\n'
+    let texto = 'LISTA DE COMPRAS - GymTrack\n\n'
     lista.forEach(item => {
       texto += `☐ ${item.nome} (${item.quantidade}x)\n`
     })
@@ -161,7 +157,7 @@ export default function DietaPage() {
               Minha Dieta
             </h1>
             <p className="text-gray-600 dark:text-gray-300 mt-1">
-              Plano alimentar personalizado com IA
+              Plano alimentar personalizado com receitas completas
             </p>
           </div>
           <Button onClick={() => router.push('/')}>
@@ -175,8 +171,9 @@ export default function DietaPage() {
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
               Você ainda não tem uma dieta
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Gere seu plano alimentar personalizado com IA baseado no seu perfil e objetivos
+            <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
+              Gere seu plano alimentar personalizado baseado no seu peso, altura, idade e objetivo. 
+              Receitas completas com modo de preparo incluídas!
             </p>
             <Button
               onClick={gerarNovaDieta}
@@ -185,7 +182,7 @@ export default function DietaPage() {
               className="bg-gradient-to-r from-green-600 to-blue-600"
             >
               <Sparkles className="w-5 h-5 mr-2" />
-              {gerando ? 'Gerando dieta...' : 'Gerar Dieta com IA'}
+              {gerando ? 'Gerando dieta personalizada...' : 'Gerar Dieta Personalizada'}
             </Button>
           </Card>
         ) : (
@@ -197,7 +194,7 @@ export default function DietaPage() {
                     Plano Alimentar Atual
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Objetivo: {dieta.objetivo}
+                    Objetivo: {dieta.objetivo} • Baseado no seu perfil
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -246,12 +243,13 @@ export default function DietaPage() {
             </Card>
 
             <Card className="p-6 bg-white dark:bg-gray-800">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <ChefHat className="w-5 h-5 text-green-600" />
                 Refeições do Dia
               </h3>
               <div className="space-y-4">
                 {refeicoes.map((refeicao, index) => (
-                  <RefeicaoCard key={index} refeicao={refeicao} plano={perfil?.plano} />
+                  <RefeicaoCard key={index} refeicao={refeicao} />
                 ))}
               </div>
             </Card>
@@ -262,9 +260,8 @@ export default function DietaPage() {
   )
 }
 
-function RefeicaoCard({ refeicao, plano }: any) {
+function RefeicaoCard({ refeicao }: any) {
   const [expandido, setExpandido] = useState(false)
-  const podeVerDetalhes = temPermissao(plano, 'dietaAvancada')
 
   const tipoNomes: any = {
     cafe: '☕ Café da Manhã',
@@ -276,10 +273,10 @@ function RefeicaoCard({ refeicao, plano }: any) {
   }
 
   return (
-    <Card className="p-4 bg-gray-50 dark:bg-gray-700">
+    <Card className="p-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 border-2 border-gray-200 dark:border-gray-600">
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h4 className="font-bold text-gray-900 dark:text-white">
+          <h4 className="font-bold text-gray-900 dark:text-white text-lg">
             {tipoNomes[refeicao.tipo] || refeicao.tipo}
           </h4>
           <p className="text-sm text-gray-600 dark:text-gray-400">{refeicao.nome}</p>
@@ -290,49 +287,56 @@ function RefeicaoCard({ refeicao, plano }: any) {
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-3">
-        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-red-200 dark:border-red-800">
           <p className="text-xs text-gray-600 dark:text-gray-400">Proteínas</p>
           <p className="font-bold text-red-600">{refeicao.proteinas}g</p>
         </div>
-        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-yellow-200 dark:border-yellow-800">
           <p className="text-xs text-gray-600 dark:text-gray-400">Carboidratos</p>
           <p className="font-bold text-yellow-600">{refeicao.carboidratos}g</p>
         </div>
-        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-purple-200 dark:border-purple-800">
           <p className="text-xs text-gray-600 dark:text-gray-400">Gorduras</p>
           <p className="font-bold text-purple-600">{refeicao.gorduras}g</p>
         </div>
       </div>
 
-      {podeVerDetalhes ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setExpandido(!expandido)}
-          className="w-full"
-        >
-          {expandido ? 'Ocultar' : 'Ver'} Ingredientes
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full"
-          disabled
-        >
-          <Lock className="w-4 h-4 mr-2" />
-          Upgrade para ver receita
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setExpandido(!expandido)}
+        className="w-full"
+      >
+        <ChefHat className="w-4 h-4 mr-2" />
+        {expandido ? 'Ocultar' : 'Ver'} Receita Completa
+      </Button>
 
-      {expandido && podeVerDetalhes && (
-        <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Ingredientes:</p>
-          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-            {refeicao.ingredientes?.map((ing: string, i: number) => (
-              <li key={i}>• {ing}</li>
-            ))}
-          </ul>
+      {expandido && (
+        <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-green-200 dark:border-green-800">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+              🥘 Ingredientes:
+            </p>
+            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              {refeicao.ingredientes?.map((ing: string, i: number) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-green-600">•</span>
+                  <span>{ing}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          {refeicao.preparo && (
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                👨‍🍳 Modo de Preparo:
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {refeicao.preparo}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </Card>

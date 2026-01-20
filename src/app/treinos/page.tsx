@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { gerarTreinoIA, calcularProgressaoCarga } from '@/lib/ai-treino'
-import { temPermissao } from '@/lib/permissions'
+import { generatePersonalizedWorkout, type UserProfile, validateUserProfile } from '@/lib/ai/workout-generator'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useRouter } from 'next/navigation'
-import { Dumbbell, Plus, Check, TrendingUp, Lock } from 'lucide-react'
+import { Dumbbell, Plus, Check, AlertCircle } from 'lucide-react'
 
 export default function TreinosPage() {
   const router = useRouter()
@@ -20,125 +18,203 @@ export default function TreinosPage() {
   const [exercicios, setExercicios] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const [gerando, setGerando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     carregarDados()
   }, [])
 
   const carregarDados = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
 
-    setUser(user)
+      setUser(user)
 
-    const { data: perfilData } = await supabase
-      .from('usuarios')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    setPerfil(perfilData)
-
-    const { data: treinoData } = await supabase
-      .from('treinos')
-      .select('*')
-      .eq('usuario_id', user.id)
-      .eq('status', 'ativo')
-      .single()
-
-    if (treinoData) {
-      setTreino(treinoData)
-      
-      const { data: exerciciosData } = await supabase
-        .from('exercicios')
+      let { data: perfilData, error: perfilError } = await supabase
+        .from('usuarios')
         .select('*')
-        .eq('treino_id', treinoData.id)
-        .order('ordem')
+        .eq('id', user.id)
+        .single()
 
-      const exerciciosPorDia: any = {}
-      exerciciosData?.forEach((ex: any) => {
-        const dia = ex.dia || 'A'
-        if (!exerciciosPorDia[dia]) {
-          exerciciosPorDia[dia] = []
+      if (perfilError && perfilError.code === 'PGRST116') {
+        const { data: novoPerfil, error: criarError } = await supabase
+          .from('usuarios')
+          .insert({
+            id: user.id,
+            email: user.email,
+            plano: 'gratuito',
+            objetivo: 'hipertrofia',
+            nivel_experiencia: 'iniciante'
+          })
+          .select()
+          .single()
+
+        if (criarError) {
+          console.error('Erro ao criar perfil:', criarError)
+          setError('Erro ao criar perfil. Tente novamente.')
+          setLoading(false)
+          return
         }
-        exerciciosPorDia[dia].push(ex)
-      })
-      
-      setExercicios(exerciciosPorDia)
-    }
 
-    setLoading(false)
+        perfilData = novoPerfil
+      } else if (perfilError) {
+        console.error('Erro ao buscar perfil:', perfilError)
+        setError('Erro ao carregar perfil. Tente novamente.')
+        setLoading(false)
+        return
+      }
+
+      setPerfil(perfilData)
+
+      const { data: treinoData } = await supabase
+        .from('treinos')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .eq('status', 'ativo')
+        .single()
+
+      if (treinoData) {
+        setTreino(treinoData)
+        
+        const { data: exerciciosData } = await supabase
+          .from('exercicios')
+          .select('*')
+          .eq('treino_id', treinoData.id)
+          .order('ordem')
+
+        const exerciciosPorDia: any = {}
+        exerciciosData?.forEach((ex: any) => {
+          const dia = ex.dia || 'A'
+          if (!exerciciosPorDia[dia]) {
+            exerciciosPorDia[dia] = []
+          }
+          exerciciosPorDia[dia].push(ex)
+        })
+        
+        setExercicios(exerciciosPorDia)
+      }
+
+      setLoading(false)
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+      setError('Erro ao carregar dados. Tente novamente.')
+      setLoading(false)
+    }
   }
 
   const gerarNovoTreino = async () => {
-    if (!perfil) return
-
-    const plano = perfil.plano || 'gratuito'
-    
-    if (!temPermissao(plano, 'treinoIA')) {
-      alert('Você precisa de um plano pago para gerar treinos com IA. Faça upgrade!')
-      router.push('/planos')
+    if (!perfil || !user) {
+      setError('Perfil não encontrado. Complete seu perfil primeiro.')
       return
     }
 
     setGerando(true)
+    setError(null)
 
-    const treinoGerado = gerarTreinoIA({
-      objetivo: perfil.objetivo || 'hipertrofia',
-      nivel: perfil.nivel_experiencia || 'iniciante',
-      frequencia: 4,
-      restricoes: perfil.restricoes_fisicas
-    })
+    try {
+      const userProfile: UserProfile = {
+        goal: (perfil.objetivo || 'hipertrofia') as any,
+        level: (perfil.nivel_experiencia || 'iniciante') as any,
+        frequency: 4,
+        restrictions: perfil.restricoes_fisicas ? [perfil.restricoes_fisicas] : [],
+        age: perfil.idade,
+        experience: perfil.meses_treino
+      }
 
-    const { data: novoTreino } = await supabase
-      .from('treinos')
-      .insert({
-        usuario_id: user.id,
-        objetivo: perfil.objetivo,
-        divisao: treinoGerado.divisao,
-        frequencia_semanal: treinoGerado.frequencia_semanal,
-        status: 'ativo'
-      })
-      .select()
-      .single()
+      const validation = validateUserProfile(userProfile)
+      if (!validation.valid) {
+        setError(`Perfil incompleto: ${validation.errors.join(', ')}`)
+        setGerando(false)
+        return
+      }
 
-    if (novoTreino) {
-      for (const [dia, exs] of Object.entries(treinoGerado.treinos)) {
-        for (const ex of exs as any[]) {
-          await supabase.from('exercicios').insert({
-            treino_id: novoTreino.id,
-            dia,
-            ...ex
-          })
+      const treinoGerado = await generatePersonalizedWorkout(userProfile, user.id)
+
+      if (treino) {
+        await supabase
+          .from('treinos')
+          .update({ status: 'inativo' })
+          .eq('id', treino.id)
+      }
+
+      const { data: novoTreino, error: treinoError } = await supabase
+        .from('treinos')
+        .insert({
+          usuario_id: user.id,
+          objetivo: treinoGerado.template.goal,
+          divisao: treinoGerado.template.split,
+          frequencia_semanal: treinoGerado.template.frequency.max,
+          status: 'ativo',
+          template_id: treinoGerado.template.id,
+          customizacoes: treinoGerado.customizations
+        })
+        .select()
+        .single()
+
+      if (treinoError) {
+        console.error('Erro ao criar treino:', treinoError)
+        setError('Erro ao gerar treino. Tente novamente.')
+        setGerando(false)
+        return
+      }
+
+      if (novoTreino) {
+        let ordem = 0
+        for (const session of treinoGerado.template.sessions) {
+          for (const exercise of session.exercises) {
+            await supabase.from('exercicios').insert({
+              treino_id: novoTreino.id,
+              dia: session.day,
+              nome: exercise.name,
+              grupo_muscular: session.focus,
+              series: exercise.sets,
+              repeticoes: exercise.reps,
+              descanso: exercise.rest ? parseInt(exercise.rest) : 60,
+              observacoes: exercise.notes,
+              ordem: ordem++,
+              carga: 0,
+              concluido: false
+            })
+          }
         }
       }
-    }
 
-    setGerando(false)
-    carregarDados()
+      setGerando(false)
+      await carregarDados()
+    } catch (error) {
+      console.error('Erro ao gerar treino:', error)
+      setError('Erro ao gerar treino. Tente novamente.')
+      setGerando(false)
+    }
   }
 
   const concluirExercicio = async (exercicioId: string, cargaUsada: number) => {
-    await supabase
-      .from('exercicios')
-      .update({ 
-        concluido: true,
-        carga: cargaUsada,
-        data_execucao: new Date().toISOString()
+    try {
+      await supabase
+        .from('exercicios')
+        .update({ 
+          concluido: true,
+          carga: cargaUsada,
+          data_execucao: new Date().toISOString()
+        })
+        .eq('id', exercicioId)
+
+      await supabase.from('historico').insert({
+        usuario_id: user.id,
+        tipo: 'treino',
+        dados: { exercicio_id: exercicioId, carga: cargaUsada },
+        data: new Date().toISOString()
       })
-      .eq('id', exercicioId)
 
-    await supabase.from('historico').insert({
-      usuario_id: user.id,
-      tipo: 'treino',
-      dados: { exercicio_id: exercicioId, carga: cargaUsada },
-      data: new Date().toISOString()
-    })
-
-    carregarDados()
+      carregarDados()
+    } catch (err) {
+      console.error('Erro ao concluir exercício:', err)
+      setError('Erro ao registrar exercício. Tente novamente.')
+    }
   }
 
   if (loading) {
@@ -159,13 +235,22 @@ export default function TreinosPage() {
               Meus Treinos
             </h1>
             <p className="text-gray-600 dark:text-gray-300 mt-1">
-              Treinos personalizados com IA
+              Treinos personalizados baseados no seu perfil
             </p>
           </div>
-          <Button onClick={() => router.push('/')}>
+          <Button onClick={() => router.push('/dashboard')}>
             Voltar
           </Button>
         </div>
+
+        {error && (
+          <Card className="p-4 mb-6 bg-red-50 dark:bg-red-900/20 border-red-500">
+            <div className="flex items-center gap-3 text-red-700 dark:text-red-300">
+              <AlertCircle className="w-5 h-5" />
+              <p>{error}</p>
+            </div>
+          </Card>
+        )}
 
         {!treino ? (
           <Card className="p-12 text-center bg-white dark:bg-gray-800">
@@ -173,8 +258,9 @@ export default function TreinosPage() {
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
               Você ainda não tem um treino
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Gere seu primeiro treino personalizado com IA baseado no seu perfil e objetivos
+            <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
+              Gere seu primeiro treino personalizado baseado no seu perfil, objetivos e nível de experiência. 
+              Nosso sistema utiliza um banco de dados com centenas de exercícios e templates profissionais.
             </p>
             <Button
               onClick={gerarNovoTreino}
@@ -182,7 +268,14 @@ export default function TreinosPage() {
               size="lg"
               className="bg-gradient-to-r from-purple-600 to-blue-600"
             >
-              {gerando ? 'Gerando treino...' : 'Gerar Treino com IA'}
+              {gerando ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Gerando treino personalizado...
+                </>
+              ) : (
+                'Gerar Treino Personalizado'
+              )}
             </Button>
           </Card>
         ) : (
@@ -196,6 +289,15 @@ export default function TreinosPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Objetivo: {treino.objetivo} • {treino.frequencia_semanal}x por semana
                   </p>
+                  {treino.customizacoes && treino.customizacoes.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {treino.customizacoes.map((custom: string, idx: number) => (
+                        <p key={idx} className="text-xs text-purple-600 dark:text-purple-400">
+                          ✓ {custom}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button
                   onClick={gerarNovoTreino}
@@ -213,7 +315,7 @@ export default function TreinosPage() {
               <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Object.keys(exercicios).length}, 1fr)` }}>
                 {Object.keys(exercicios).map(dia => (
                   <TabsTrigger key={dia} value={dia}>
-                    Treino {dia}
+                    {dia}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -225,7 +327,6 @@ export default function TreinosPage() {
                       key={ex.id}
                       exercicio={ex}
                       onConcluir={concluirExercicio}
-                      plano={perfil?.plano || 'gratuito'}
                     />
                   ))}
                 </TabsContent>
@@ -238,22 +339,17 @@ export default function TreinosPage() {
   )
 }
 
-function ExercicioCard({ exercicio, onConcluir, plano }: any) {
-  const [carga, setCarga] = useState(exercicio.carga)
+function ExercicioCard({ exercicio, onConcluir }: any) {
+  const [carga, setCarga] = useState(exercicio.carga || 0)
   const [concluido, setConcluido] = useState(exercicio.concluido || false)
-  const podeRegistrar = temPermissao(plano, 'registroCarga')
 
   const handleConcluir = () => {
-    if (!podeRegistrar) {
-      alert('Você precisa de um plano pago para registrar cargas!')
-      return
-    }
     onConcluir(exercicio.id, carga)
     setConcluido(true)
   }
 
   return (
-    <Card className={`p-6 ${concluido ? 'bg-green-50 dark:bg-green-900/20 border-green-500' : 'bg-white dark:bg-gray-800'}`}>
+    <Card className={`p-6 transition-all ${concluido ? 'bg-green-50 dark:bg-green-900/20 border-green-500' : 'bg-white dark:bg-gray-800'}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
@@ -262,6 +358,11 @@ function ExercicioCard({ exercicio, onConcluir, plano }: any) {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {exercicio.grupo_muscular}
           </p>
+          {exercicio.observacoes && (
+            <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+              💡 {exercicio.observacoes}
+            </p>
+          )}
         </div>
         {concluido && (
           <div className="flex items-center gap-2 text-green-600">
@@ -294,24 +395,19 @@ function ExercicioCard({ exercicio, onConcluir, plano }: any) {
           <Input
             type="number"
             value={carga}
-            onChange={(e) => setCarga(parseFloat(e.target.value))}
-            disabled={concluido || !podeRegistrar}
+            onChange={(e) => setCarga(parseFloat(e.target.value) || 0)}
+            disabled={concluido}
             className="w-full"
+            min="0"
+            step="0.5"
           />
         </div>
         <Button
           onClick={handleConcluir}
-          disabled={concluido || !podeRegistrar}
+          disabled={concluido}
           className="bg-gradient-to-r from-purple-600 to-blue-600"
         >
-          {podeRegistrar ? (
-            concluido ? 'Concluído' : 'Concluir'
-          ) : (
-            <>
-              <Lock className="w-4 h-4 mr-2" />
-              Bloqueado
-            </>
-          )}
+          {concluido ? 'Concluído' : 'Concluir'}
         </Button>
       </div>
     </Card>
