@@ -4,90 +4,81 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
-import { useRouter } from 'next/navigation'
+import { Label } from '@/components/ui/label'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { UserPlus, Mail, Lock, User } from 'lucide-react'
 
 export default function CadastroPage() {
   const router = useRouter()
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
-  const [senha, setSenha] = useState('')
-  const [confirmarSenha, setConfirmarSenha] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState('')
+  const [error, setError] = useState('')
 
   const handleCadastro = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setErro('')
+    setError('')
 
-    if (senha !== confirmarSenha) {
-      setErro('As senhas não coincidem')
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem')
       setLoading(false)
       return
     }
 
-    if (senha.length < 6) {
-      setErro('A senha deve ter no mínimo 6 caracteres')
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres')
       setLoading(false)
       return
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: senha,
-      options: {
-        data: {
-          nome: nome,
-        }
-      }
-    })
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            nome: nome,
+          },
+        },
+      })
 
-    if (error) {
-      setErro(error.message)
+      if (error) throw error
+
+      router.push('/')
+    } catch (error: any) {
+      setError(error.message || 'Erro ao criar conta')
+    } finally {
       setLoading(false)
-    } else {
-      // Criar perfil do usuário
-      if (data.user) {
-        await supabase.from('usuarios').insert({
-          id: data.user.id,
-          email: email,
-          nome: nome,
-          plano: 'gratuito'
-        })
-      }
-      router.push('/onboarding')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md p-8 bg-white dark:bg-gray-800">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-blue-600 rounded-full mb-4">
-            <UserPlus className="w-8 h-8 text-white" />
-          </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Crie sua conta
+            Criar Conta Grátis
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Comece sua transformação hoje mesmo
+          <p className="text-gray-600 dark:text-gray-400">
+            Comece sua jornada fitness agora!
           </p>
         </div>
 
-        <form onSubmit={handleCadastro} className="space-y-4">
-          <div>
-            <Label htmlFor="nome" className="flex items-center gap-2 mb-2">
+        <form onSubmit={handleCadastro} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="nome" className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              Nome completo
+              Nome
             </Label>
             <Input
               id="nome"
               type="text"
-              placeholder="Seu nome"
+              placeholder="Seu nome completo"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               required
@@ -95,8 +86,8 @@ export default function CadastroPage() {
             />
           </div>
 
-          <div>
-            <Label htmlFor="email" className="flex items-center gap-2 mb-2">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
               Email
             </Label>
@@ -111,58 +102,68 @@ export default function CadastroPage() {
             />
           </div>
 
-          <div>
-            <Label htmlFor="senha" className="flex items-center gap-2 mb-2">
+          <div className="space-y-2">
+            <Label htmlFor="password" className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Senha
             </Label>
             <Input
-              id="senha"
+              id="password"
               type="password"
-              placeholder="Mínimo 6 caracteres"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full"
             />
           </div>
 
-          <div>
-            <Label htmlFor="confirmarSenha" className="flex items-center gap-2 mb-2">
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword" className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
-              Confirmar senha
+              Confirmar Senha
             </Label>
             <Input
-              id="confirmarSenha"
+              id="confirmPassword"
               type="password"
-              placeholder="Digite a senha novamente"
-              value={confirmarSenha}
-              onChange={(e) => setConfirmarSenha(e.target.value)}
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               className="w-full"
             />
           </div>
 
-          {erro && (
+          {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{erro}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
 
           <Button
             type="submit"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
           >
-            {loading ? 'Criando conta...' : 'Criar conta grátis'}
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Criando conta...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Criar Conta
+              </div>
+            )}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             Já tem uma conta?{' '}
             <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-semibold">
-              Faça login
+              Entrar
             </Link>
           </p>
         </div>

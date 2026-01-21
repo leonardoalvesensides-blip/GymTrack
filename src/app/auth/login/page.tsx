@@ -4,55 +4,55 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
-import { useRouter } from 'next/navigation'
+import { Label } from '@/components/ui/label'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { LogIn, Mail, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [senha, setSenha] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState('')
+  const [error, setError] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setErro('')
+    setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setErro('Email ou senha incorretos')
-      setLoading(false)
-    } else {
+      if (error) throw error
+
       router.push('/')
+    } catch (error: any) {
+      setError(error.message || 'Erro ao fazer login')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center px-4">
       <Card className="w-full max-w-md p-8 bg-white dark:bg-gray-800">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mb-4">
-            <LogIn className="w-8 h-8 text-white" />
-          </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Bem-vindo de volta!
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Entre para continuar sua jornada fitness
+          <p className="text-gray-600 dark:text-gray-400">
+            Entre na sua conta GymTrack
           </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <Label htmlFor="email" className="flex items-center gap-2 mb-2">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
               Email
             </Label>
@@ -67,42 +67,52 @@ export default function LoginPage() {
             />
           </div>
 
-          <div>
-            <Label htmlFor="senha" className="flex items-center gap-2 mb-2">
+          <div className="space-y-2">
+            <Label htmlFor="password" className="flex items-center gap-2">
               <Lock className="w-4 h-4" />
               Senha
             </Label>
             <Input
-              id="senha"
+              id="password"
               type="password"
               placeholder="••••••••"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full"
             />
           </div>
 
-          {erro && (
+          {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{erro}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
 
           <Button
             type="submit"
-            disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            disabled={loading}
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Entrando...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <LogIn className="w-4 h-4" />
+                Entrar
+              </div>
+            )}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             Não tem uma conta?{' '}
             <Link href="/auth/cadastro" className="text-blue-600 hover:text-blue-700 font-semibold">
-              Cadastre-se grátis
+              Criar conta grátis
             </Link>
           </p>
         </div>
